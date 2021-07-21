@@ -847,6 +847,7 @@ if
   test \"\`\\\\command \\\\ps -p \$\$ -o ${ps_ucomm_alias}=\`\" != sh
 then
   [[ -n \"\${rvm_stored_umask:-}\" ]] || export rvm_stored_umask=\$(umask)
+
   # Load user rvmrc configurations, if exist
   for file in \"/etc/rvmrc\" \"\$HOME/.rvmrc\"
   do
@@ -860,7 +861,7 @@ then
     source \"\${rvm_prefix}/.rvmrc\"
   fi
 
-  # Load RVM if it is installed, try user then root install.
+  # Load RVM if it is installed, try user then root install
   if
     [[ -s \"\$rvm_path/scripts/rvm\" ]]
   then
@@ -877,7 +878,7 @@ then
     source \"/usr/local/rvm/scripts/rvm\"
   fi
 
-  # Add \$rvm_bin_path to \$PATH if necessary. Make sure this is the last PATH variable change.
+  # Add \$rvm_bin_path to \$PATH if necessary. Make sure this is the last PATH variable change
   if [[ -n \"\${rvm_bin_path}\" && ! \":\${PATH}:\" == *\":\${rvm_bin_path}:\"* ]]
   then PATH=\"\${PATH}:\${rvm_bin_path}\"
   fi
@@ -1416,6 +1417,7 @@ update_gemsets_install_rvm()
             if [[ "${__gem_home}" == *"@*" ]]
             then continue
             fi
+            __rvm_with "${__gem_home##*/}" gem pristine gem-wrappers --only-plugins
             __rvm_with "${__gem_home##*/}" gem wrappers regenerate
           done
         done | __rvm_dotted "    Regenerating gem wrappers in ${#missing[@]} rubies"

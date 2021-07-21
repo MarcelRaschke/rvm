@@ -233,26 +233,55 @@ __rvm_select_interpreter_jruby()
   true # for OSX
 }
 
-__rvm_select_interpreter_truffleruby()
+__rvm_truffleruby_set_version()
 {
-  rvm_ruby_version="${rvm_ruby_version:-$(__rvm_db "truffleruby_version")}"
+  if (( ${rvm_head_flag:=0} == 1 ))
+  then
+    rvm_ruby_version="head"
+    truffleruby_version="head"
+  else
+    rvm_ruby_version="${rvm_ruby_version:-$(__rvm_db "truffleruby_version")}"
+    truffleruby_version="${rvm_ruby_version}${rvm_ruby_patch_level:+-}${rvm_ruby_patch_level:-}"
+  fi
 
+  true # for OSX
+}
+
+__rvm_truffleruby_set_rvm_ruby_url()
+{
   case "${_system_type}" in
-    "Linux") platform="linux" ;;
-    "Darwin") platform="macos" ;;
+    Linux) platform="linux" ;;
+    Darwin) platform="macos" ;;
     *) rvm_error "TruffleRuby does not support ${_system_type} currently." ;;
   esac
 
   case "${_system_arch}" in
-    "x86_64") arch=amd64 ;;
+    x86_64) arch=amd64 ;;
     *) rvm_error "TruffleRuby does not support ${_system_arch} currently." ;;
   esac
 
-  truffleruby_version="${rvm_ruby_version}${rvm_ruby_patch_level:+-}${rvm_ruby_patch_level:-}"
   rvm_ruby_package_name="truffleruby-${truffleruby_version}"
-  rvm_ruby_package_file="${rvm_ruby_package_name}-${platform}-${arch}"
-  truffleruby_baseurl="vm-${truffleruby_version}/${rvm_ruby_package_file}.tar.gz"
-  rvm_ruby_url="${rvm_ruby_repo_url:-$(__rvm_db "truffleruby_url")/${truffleruby_baseurl}}"
+
+  if (( ${rvm_head_flag:=0} == 1 )); then
+    case "$platform" in
+      linux) platform="ubuntu-18.04" ;;
+      macos) platform="macos-latest" ;;
+    esac
+
+    rvm_ruby_package_file="${rvm_ruby_package_name}-${platform}"
+    rvm_ruby_url="${rvm_ruby_repo_url:-https://github.com/ruby/truffleruby-dev-builder/releases/latest/download/${rvm_ruby_package_file}.tar.gz}"
+  else
+    rvm_ruby_package_file="${rvm_ruby_package_name}-${platform}-${arch}"
+    rvm_ruby_url="${rvm_ruby_repo_url:-$(__rvm_db "truffleruby_url")/vm-${truffleruby_version}/${rvm_ruby_package_file}.tar.gz}"
+  fi
+
+  true # for OSX
+}
+
+__rvm_select_interpreter_truffleruby()
+{
+  __rvm_truffleruby_set_version
+  __rvm_truffleruby_set_rvm_ruby_url
 
   true # for OSX
 }
@@ -399,8 +428,10 @@ __rvm_select_interpreter_ruby()
     rvm_ruby_patch_level=""
     rvm_ruby_string="${rvm_ruby_string%-p0}"
   fi
+
   rvm_ruby_package_name="${rvm_ruby_interpreter}-${rvm_ruby_version}${rvm_ruby_patch_level:+-}${rvm_ruby_patch_level:-}"
   rvm_ruby_package_file="${rvm_ruby_package_name}"
+
   if
     [[ -z "${rvm_ruby_version:-""}" ]] &&
     (( ${rvm_head_flag:=0} == 0 ))
@@ -408,10 +439,13 @@ __rvm_select_interpreter_ruby()
     rvm_error "Ruby version was not specified!"
   else
     rvm_ruby_repo_url="${rvm_ruby_repo_url:-"$(__rvm_db "ruby_repo_url")"}"
+
     if
       (( ${rvm_head_flag:=0} == 0 ))
     then
-      if __rvm_version_compare "${rvm_ruby_version}" -lt "1.8.5"
+      if __rvm_version_compare "${rvm_ruby_version}" -ge "3.0.0"
+      then rvm_archive_extension="tar.gz"
+      elif __rvm_version_compare "${rvm_ruby_version}" -lt "1.8.5"
       then rvm_archive_extension="tar.gz"
       else rvm_archive_extension="tar.bz2"
       fi
@@ -419,6 +453,7 @@ __rvm_select_interpreter_ruby()
       rvm_disable_binary_flag=1
     fi
   fi
+
   true # for OSX
 }
 

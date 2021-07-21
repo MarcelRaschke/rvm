@@ -186,7 +186,7 @@ __variables_definition()
 
   # prevent errors with bash "set -a", see https://github.com/rvm/rvm/issues/2872
   if [[ -n "${BASH_VERSION:-}" ]]
-  then export -fn __rvm_select_version_variables __rvm_ruby_string_parse_ __rvm_rm_rf_verbose __rvm_parse_args 2>/dev/null || true
+  then export -fn __rvm_select_version_variables __rvm_ruby_string_parse_ __rvm_rm_rf_verbose __rvm_parse_args __rvm_ruby_string_find __rvm_file_load_env __rvm_remove_without_gems 2>/dev/null || true
   fi
 }
 
@@ -206,13 +206,14 @@ __rvm_setup()
     [[ -n "${BASH_VERSION:-}" ]] && ! __function_on_stack cd pushd popd
   then
     export rvm_shell_nounset
+
     if __rvm_has_opt "nounset"
     then rvm_bash_nounset=1
     else rvm_bash_nounset=0
     fi
-    set +o nounset
 
-    _rvm_old_traps=$( trap | __rvm_grep -E 'EXIT|HUP|INT|QUIT|TERM' )
+    set +o nounset
+    _rvm_old_traps=$( trap | __rvm_grep -E 'EXIT|HUP|INT|QUIT|TERM' || true )
     trap '__rvm_teardown_final ; set +x' EXIT HUP INT QUIT TERM
   fi
 
@@ -248,7 +249,7 @@ __rvm_teardown()
   # decrease load count counter
   : __rvm_env_loaded:$(( __rvm_env_loaded-=1 )):
 
-  #skip teardown when already done or when not yet finished
+  # skip teardown when already done or when not yet finished
   if [[ -z "${rvm_tmp_path:-}" ]] || (( __rvm_env_loaded > 0 ))
   then return 0
   fi
@@ -294,6 +295,8 @@ __rvm_teardown()
   fi
 
   __variables_definition unset
+
+  unset _system_arch _system_name _system_type _system_version
 
   return 0
 }

@@ -17,7 +17,7 @@ __rvm_version_authors()
 
 __rvm_version_copyright()
 {
-  echo "(c) 2009-2017 $(__rvm_version_authors)"
+  echo "(c) 2009-2020 $(__rvm_version_authors)"
 }
 
 __rvm_print_headline()
@@ -28,7 +28,7 @@ __rvm_print_headline()
 
 __rvm_version_remote()
 {
-  __rvm_curl -s --max-time 10 https://github.com/rvm/rvm/raw/master/VERSION || true
+  __rvm_curl -s --max-time 10 https://github.com/rvm/rvm/raw/stable/VERSION || true
 }
 
 __rvm_version_installed()

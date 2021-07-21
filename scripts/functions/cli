@@ -180,14 +180,19 @@ __rvm_cli_autoupdate_version_old()
   online_version="$( __rvm_version_remote )"
   version_release="$(\command \cat "$rvm_path/RELEASE" 2>/dev/null)"
   : version_release:"${version_release:=master}"
-  [[ -s "$rvm_path/VERSION" && -n "${online_version:-}" && "${rvm_version%% *}" != "${online_version:-}" ]] || return $?
+  if [[ "${online_version}-next" == "${rvm_version%% *}" ]]; then # development version newer than latest release
+    return 1
+  fi
+  [[ -s "$rvm_path/VERSION" && -n "${online_version:-}" ]] && __rvm_version_compare "${rvm_version%% *}" -lt "${online_version:-}" || return $?
 }
 
 __rvm_cli_autoupdate_warning()
 {
   rvm_warn "Warning, new version of rvm available '${online_version}', you are using older version '${rvm_version%% *}'.
-You can disable this warning with:    echo rvm_autoupdate_flag=0 >> ~/.rvmrc
-You can enable  auto-update  with:    echo rvm_autoupdate_flag=2 >> ~/.rvmrc"
+You can disable this warning with:   echo rvm_autoupdate_flag=0 >> ~/.rvmrc
+You can enable auto-update with:     echo rvm_autoupdate_flag=2 >> ~/.rvmrc
+You can update manually with:        rvm get VERSION                         (e.g. 'rvm get stable')
+"
 }
 
 # duplication marker flnglfdjkngjndkfjhsbdjgfghdsgfklgg
@@ -214,44 +219,41 @@ verify_package_pgp()
   then
     rvm_notify "GPG verified '$1'"
   else
-    \typeset _ret=$?
-    rvm_error "\
-Warning, RVM 1.26.0 introduces signed releases and automated check of signatures when GPG software found. \
-Assuming you trust Michal Papis import the mpapis public key (downloading the signatures).
+    \typeset _return=$?
 
+    rvm_error "\
 GPG signature verification failed for '$1' - '$3'! Try to install GPG v2 and then fetch the public key:
 
-    ${SUDO_USER:+sudo }gpg2 --recv-keys 409B6B1796C275462A1703113804BB82D39DC0E3
+    ${SUDO_USER:+sudo }${rvm_gpg_command##*/} --keyserver hkp://pool.sks-keyservers.net --recv-keys 409B6B1796C275462A1703113804BB82D39DC0E3 7D2BAF1CF37B13E2069D6956105BD0E739499BDB
 
 or if it fails:
 
     command curl -sSL https://rvm.io/mpapis.asc | ${SUDO_USER:+sudo }${rvm_gpg_command##*/} --import -
+    command curl -sSL https://rvm.io/pkuczynski.asc | ${SUDO_USER:+sudo }${rvm_gpg_command##*/} --import -
 
-the key can be compared with:
-
-    https://rvm.io/mpapis.asc
-    https://keybase.io/mpapis
-
-NOTE: GPG version 2.1.17 have a bug which cause failures during fetching keys from remote server. Please downgrade \
-or upgrade to newer version (if available) or use the second method described above.
+In case of further problems with validation please refer to https://rvm.io/rvm/security
 "
-    return _ret
+
+    return ${_return}
   fi
 }
 
 __rvm_cli_get_and_verify_pgp()
 {
   \typeset rvm_gpg_command
+
   if
     rvm_install_gpg_setup
   then
     pgp_signature_url="$( __rvm_curl -sSI https://get.rvm.io | \tr "\r" " " | __rvm_awk '/Location:/{print $2".asc"}' )"
+
     rvm_notify "Downloading $pgp_signature_url"
-    __rvm_curl -s "${pgp_signature_url}" -o "${rvm_archives_path}/rvm-installer.asc" ||
-      return $?
+
+    __rvm_curl -s "${pgp_signature_url}" -o "${rvm_archives_path}/rvm-installer.asc" || return $?
+
     rvm_notify "Verifying ${rvm_archives_path}/rvm-installer.asc"
-    verify_package_pgp "${rvm_archives_path}/rvm-installer" "${rvm_archives_path}/rvm-installer.asc" "$pgp_signature_url" ||
-      return $?
+
+    verify_package_pgp "${rvm_archives_path}/rvm-installer" "${rvm_archives_path}/rvm-installer.asc" "$pgp_signature_url" || return $?
   else
     rvm_warn "No GPG software exists to validate rvm-installer, skipping."
   fi
@@ -386,7 +388,7 @@ __rvm_cli_install_ruby()
     then __rvm_run_wrapper manage install "${__rubies}" || return $?
     fi
   else
-    rvm_error "Can not use or install 'all' rubies."
+    rvm_error "Can not use or install 'all' rubies. You can get a list of installable rubies with 'rvm list known'."
     false #report error
   fi
 )

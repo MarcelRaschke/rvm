@@ -134,7 +134,8 @@ is_gem_installed()
   else
     version_check="*([[:digit:]\.])"
   fi
-  ls -ld "${rvm_ruby_gem_home:-$GEM_HOME}/gems"/${gem_name}-${version_check} >/dev/null 2>&1 ||
+
+  __rvm_ls -ld "${rvm_ruby_gem_home:-$GEM_HOME}/gems"/${gem_name}-${version_check} >/dev/null 2>&1 ||
   "${rvm_ruby_binary}" -rrubygems -e "$gem_spec" 2>/dev/null ||
   return $?
 }
@@ -168,7 +169,7 @@ gem_install_force()
   \typeset -a install_params
 
   install_params=()
-  __available_gem="$( \ls -v1 "${rvm_path}/gem-cache"/${gem_name}-${version_check}.gem 2>/dev/null | tail -n 1 )"
+  __available_gem="$( __rvm_ls -v1 "${rvm_path}/gem-cache"/${gem_name}-${version_check}.gem 2>/dev/null | tail -n 1 )"
 
   if   [[ -n "${__available_gem}" ]]
   then install_params+=( --local )
@@ -181,7 +182,17 @@ gem_install_force()
   else install_params+=( --no-ri --no-rdoc )
   fi
 
-  install_params+=( $rvm_gem_options )
+  for __gem_option in ${rvm_gem_options}
+  do
+    case "${__gem_option}" in
+      (--no-ri|--no-rdoc|--no-document)
+        # skip
+        ;;
+      (*)
+        install_params+=( "${__gem_option}" )
+        ;;
+    esac
+  done
 
   __rvm_log_command \
     "gem.install.${gem_name}${gem_version:+-}${gem_version:-}" \
@@ -308,7 +319,10 @@ gemset_import()
 # Loads the default gemsets for the current interpreter and gemset.
 gemset_initial()
 {
-  \typeset gemsets gemset _iterator paths
+  \typeset gemsets gemset _iterator paths _jruby_opts
+
+  _jruby_opts=$JRUBY_OPTS
+  export JRUBY_OPTS="${JRUBY_OPTS} --dev"
 
   true ${rvm_gemsets_path:="$rvm_path/gemsets"}
 
@@ -330,16 +344,27 @@ gemset_initial()
       rvm_debug "$rvm_ruby_string - #gemset definition does not exist ${_iterator}/$1.gems"
     fi
   done
+  
   __rvm_log_command "gemset.wrappers.$1" \
     "$rvm_ruby_string - #generating ${1} wrappers" \
     run_gem_wrappers regenerate 2>/dev/null || true
+
+   export JRUBY_OPTS=${_jruby_opts}
 }
 
 run_gem_wrappers()
 {
   gem_install gem-wrappers >/dev/null &&
+  gem_wrappers_pristine &&
     gem wrappers "$@" ||
     return $?
+}
+
+gem_wrappers_pristine()
+{
+  if [ "$(printf '%s\n' "3.2.0" "$(gem -v)" | sort -V | head -n1)" == "3.2.0" ]
+  then gem pristine gem-wrappers --only-plugins > /dev/null
+  fi
 }
 
 __rvm_rubygems_create_link()
@@ -507,7 +532,7 @@ gemset_pristine()
     if
       (( ${#_failed[@]} > 0 ))
     then
-      rvm_error "\n'${_pristine_command[*]} ${_failed[*]}' failed, you need to fix this gems manually."
+      rvm_error "\n'${_pristine_command[*]} ${_failed[*]}' failed, you need to fix these gems manually."
       return 1
     else
       rvm_log "\nfinished."

@@ -56,15 +56,17 @@ __rvm_remove_from_path()
   \typeset _value
   _value="${1//+(\/)//}"
 
-  # remove multiple slashes https://github.com/rvm/rvm/issues/1364
+  # Guard to prevent removal of the entire path
+  # https://github.com/rvm/rvm/issues/4759
   if
-    [[ "$PATH" == *"//"* || "$PATH" == *"/:"* ]]
+    [[ $_value == "/*" ]]
   then
-    if [[ "${_system_type}" = "Darwin" ]]
-    then PATH="$(\sed -E -e 's#/+#/#g' -e 's#/:#:#' <<<$PATH)"
-    else PATH="$(\sed -r -e 's#/+#/#g' -e 's#/:#:#' <<<$PATH)"
-    fi
+    return
   fi
+
+  # remove multiple slashes https://github.com/rvm/rvm/issues/1364
+  while [[ "$PATH" == *"//"* ]] ; do PATH="${PATH/\/\///}" ; done
+  while [[ "$PATH" == *"/:"* ]] ; do PATH="${PATH/\/:/:}" ; done
 
   if
     __rvm_string_match ":$PATH:" "*:${_value}:*"
@@ -284,7 +286,7 @@ __rvm_find_first_file()
 file_exists_at_url_command()
 {
   __rvm_curl --silent --insecure --location --list-only \
-    --max-time ${rvm_max_time_flag:-5} --head -X GET "$@" 2>&1 |
+    --max-time ${rvm_max_time_flag:-5} --head "$@" 2>&1 |
     __rvm_grep -E 'HTTP/[0-9\.]+ 200' >/dev/null 2>&1 ||
     {
       \typeset __ret=$?
@@ -325,6 +327,7 @@ file_exists_at_url()
     return 1
   fi
 )
+
 __rvm_try_sudo()
 (
   \typeset -a command_to_run
@@ -393,4 +396,9 @@ __rvm_calculate_space_used()
 {
   __used_space="$( \command \du -msc "$@" | __rvm_awk 'END {print $1}' )"
   __used_space="${__used_space%M}"
+}
+
+__rvm_require()
+{
+  [[ -f "$1" ]] && source "$1"
 }
